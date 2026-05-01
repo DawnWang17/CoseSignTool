@@ -108,11 +108,13 @@
         </ItemGroup>
         
         <!-- For subdirectory isolation: Copy ALL plugin files to create self-contained plugin directories -->
-        <!-- Exclude only .NET framework assemblies (System.*, mscorlib, netstandard, Microsoft.CSharp, etc.) to avoid duplication -->
+        <!-- Exclude only true .NET BCL assemblies that ship with the runtime. Do NOT strip System.*
+             generally — out-of-band NuGet packages with System.* names (System.ClientModel,
+             System.Memory.Data, System.IO.Pipelines, System.Text.Json polyfills, etc.) are
+             legitimate plugin-private dependencies that must be deployed alongside the plugin. -->
         <ItemGroup>
             <PluginSpecificFiles Include="@(AllPluginFiles)" 
-                Condition="!$([System.String]::new('%(Filename)').StartsWith('System.')) 
-                    AND '%(Filename)' != 'mscorlib' 
+                Condition="'%(Filename)' != 'mscorlib' 
                     AND '%(Filename)' != 'netstandard' 
                     AND '%(Filename)' != 'Microsoft.CSharp' 
                     AND '%(Filename)' != 'WindowsBase' 

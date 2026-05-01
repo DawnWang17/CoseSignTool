@@ -18,9 +18,13 @@ namespace CoseSignTool.Abstractions;
 /// <list type="number">
 ///   <item>
 ///     <b>Framework prefix match</b> — a tiny prefix list capturing the .NET / BCL families
-///     (<c>System.*</c>, <c>Microsoft.Extensions.*</c>, <c>Microsoft.NETCore.*</c>) plus exact
-///     framework names (<c>System</c>, <c>mscorlib</c>, <c>netstandard</c>). These namespaces are
-///     owned by Microsoft / the .NET runtime and have no third-party collision risk.
+///     (<c>Microsoft.Extensions.*</c>, <c>Microsoft.NETCore.*</c>) plus exact framework names
+///     (bare <c>System</c>, <c>mscorlib</c>, <c>netstandard</c>). True BCL <c>System.*</c>
+///     assemblies (<c>System.Collections</c>, <c>System.Runtime</c>, etc.) are not listed
+///     explicitly; they live in TPA and are resolved by the runtime's default-context fallback
+///     when our <see cref="Load"/> returns null. This intentionally allows out-of-band NuGet
+///     packages with <c>System.*</c> names (<c>System.ClientModel</c>, <c>System.Memory.Data</c>,
+///     <c>System.IO.Pipelines</c>, etc.) to be loaded plugin-locally.
 ///   </item>
 ///   <item>
 ///     <b>Exact-name allow-list</b> — a curated <see cref="HashSet{T}"/> of repo-owned assemblies
@@ -46,7 +50,8 @@ namespace CoseSignTool.Abstractions;
 ///   <item><c>CoseSign1.Transparent.MST</c>, <c>CoseSign1.Certificates.AzureArtifactSigning</c> —
 ///         fully plugin-local. The shared library and the SDK types it extends now co-locate in
 ///         the plugin's ALC, removing the type-identity bug class entirely.</item>
-///   <item><c>Azure.*</c> SDK packages — only used inside individual plugins.</item>
+///   <item><c>Azure.*</c> SDK packages and out-of-band <c>System.*</c> NuGet packages — only used
+///         inside individual plugins.</item>
 ///   <item><c>Newtonsoft.Json</c> — plugins ship their own copy if they use it.</item>
 /// </list>
 /// </para>
@@ -54,12 +59,21 @@ namespace CoseSignTool.Abstractions;
 public class PluginLoadContext : AssemblyLoadContext
 {
     /// <summary>
-    /// Framework / BCL assembly-name prefixes always sourced from the host. These namespaces are
-    /// owned by Microsoft / the .NET ecosystem; prefix matching here is collision-safe.
+    /// Framework / BCL assembly-name prefixes always sourced from the host. <c>Microsoft.Extensions.*</c>
+    /// is treated as a shared family because <see cref="Microsoft.Extensions.Configuration.IConfiguration"/>
+    /// (and helpers around it) cross the host/plugin boundary, and the .NET ecosystem co-versions
+    /// these packages carefully.
     /// </summary>
+    /// <remarks>
+    /// <c>System.*</c> is intentionally NOT here — that namespace is mixed: BCL assemblies
+    /// (<c>System.Collections</c>, <c>System.Runtime</c>) live in TPA and resolve naturally via the
+    /// default context fallback when our <see cref="Load"/> returns null, while
+    /// out-of-band NuGet packages with <c>System.*</c> names (<c>System.ClientModel</c>,
+    /// <c>System.Memory.Data</c>, <c>System.IO.Pipelines</c>, etc.) are legitimate plugin-private
+    /// dependencies that must be loadable from the plugin directory.
+    /// </remarks>
     private static readonly string[] FrameworkPrefixes =
     {
-        "System.",
         "Microsoft.Extensions.",
         "Microsoft.NETCore.",
     };

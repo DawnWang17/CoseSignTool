@@ -47,29 +47,16 @@ public class PluginLoadContextAdvancedTests
     }
 
     /// <summary>
-    /// Tests IsHostShared with System assemblies.
+    /// Tests IsHostShared with System assemblies. Note: BCL <c>System.*</c> is no longer
+    /// pre-emptively shared — the runtime's default-context fallback handles them via TPA.
+    /// Only the bare <c>System</c> name and the dotted-prefix-less framework families remain
+    /// in the explicit prefix list. This test is retained as a documented contract.
     /// </summary>
     [TestMethod]
-    public void IsHostShared_WithSystemAssemblies_ShouldReturnTrue()
+    public void IsHostShared_WithBareSystemName_ShouldReturnTrue()
     {
-        // Arrange
-        string[] systemAssemblies = {
-            "System",
-            "System.Collections",
-            "System.Collections.Concurrent",
-            "System.IO",
-            "System.Runtime",
-            "System.Text.Json",
-            "System.Threading.Tasks",
-            "System.Reflection.Emit"
-        };
-
-        // Act & Assert
-        foreach (string assemblyName in systemAssemblies)
-        {
-            bool result = PluginLoadContext.IsHostShared(assemblyName);
-            Assert.IsTrue(result, $"'{assemblyName}' should be recognized as a shared framework assembly");
-        }
+        bool result = PluginLoadContext.IsHostShared("System");
+        Assert.IsTrue(result, "Bare 'System' assembly must be host-shared (BCL).");
     }
 
     /// <summary>
@@ -118,12 +105,14 @@ public class PluginLoadContextAdvancedTests
 
     /// <summary>
     /// Tests IsHostShared with bare framework assembly names that need exact matching
-    /// (no trailing dot) to avoid collisions like "netstandardX" or "mscorlibX".
+    /// (no trailing dot) to avoid collisions like "netstandardX" or "mscorlibX". Includes
+    /// bare "System" because the unprefixed System assembly is BCL-only.
     /// </summary>
     [TestMethod]
     public void IsHostShared_WithBareFrameworkNames_ShouldReturnTrue()
     {
         string[] frameworkNames = {
+            "System",
             "netstandard",
             "mscorlib",
             "WindowsBase",
@@ -135,6 +124,39 @@ public class PluginLoadContextAdvancedTests
         {
             bool result = PluginLoadContext.IsHostShared(assemblyName);
             Assert.IsTrue(result, $"'{assemblyName}' is a bare framework name and must be host-shared");
+        }
+    }
+
+    /// <summary>
+    /// Tests that BCL <c>System.*</c> assemblies do NOT match a shared prefix anymore. They
+    /// resolve via the runtime's default-context fallback (TPA) when <c>PluginLoadContext.Load</c>
+    /// returns null, so functional behavior is preserved. The deliberate non-listing here lets
+    /// out-of-band <c>System.*</c> NuGet packages (like <c>System.ClientModel</c>) load
+    /// plugin-locally when shipped alongside a plugin.
+    /// </summary>
+    [TestMethod]
+    public void IsHostShared_WithSystemDotPrefix_ShouldReturnFalse()
+    {
+        string[] systemDotNames = {
+            "System.Collections",
+            "System.Collections.Concurrent",
+            "System.IO",
+            "System.Runtime",
+            "System.Text.Json",
+            "System.Threading.Tasks",
+            "System.Reflection.Emit",
+            // NuGet packages with System.* names that legitimately ship as plugin-private deps:
+            "System.ClientModel",
+            "System.Memory.Data",
+            "System.IO.Pipelines",
+            "System.Diagnostics.DiagnosticSource",
+            "System.Security.Cryptography.ProtectedData",
+        };
+
+        foreach (string assemblyName in systemDotNames)
+        {
+            bool result = PluginLoadContext.IsHostShared(assemblyName);
+            Assert.IsFalse(result, $"'{assemblyName}' must NOT match a shared prefix — BCL System.* resolves via default-context fallback, NuGet System.* may be plugin-local");
         }
     }
 
@@ -261,9 +283,8 @@ public class PluginLoadContextAdvancedTests
     {
         // Arrange — only assemblies that ARE host-shared after the cleanup
         string[] differentCasingAssemblies = {
-            "system.collections",
-            "SYSTEM.IO",
-            "Microsoft.extensions.logging",
+            "system",                       // bare framework name (exact match, case-insensitive)
+            "Microsoft.extensions.logging", // Microsoft.Extensions.* prefix
             "COSESIGNTOOL.ABSTRACTIONS",
             "cosesign1.abstractions",
             "cosesign1.HEADERS",
