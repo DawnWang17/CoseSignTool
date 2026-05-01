@@ -203,7 +203,7 @@ public class PluginLoadContext : AssemblyLoadContext
             {
                 return LoadFromAssemblyPath(expectedPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is FileNotFoundException or BadImageFormatException or FileLoadException or ArgumentException)
             {
                 Console.Error.WriteLine($"Warning: Failed to load assembly '{assemblyName.Name}' from '{expectedPath}': {ex.Message}");
             }
@@ -216,7 +216,7 @@ public class PluginLoadContext : AssemblyLoadContext
             {
                 return LoadFromAssemblyPath(assemblyPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is FileNotFoundException or BadImageFormatException or FileLoadException or ArgumentException)
             {
                 Console.Error.WriteLine($"Warning: Failed to load assembly '{assemblyName.Name}' from resolver path '{assemblyPath}': {ex.Message}");
             }
