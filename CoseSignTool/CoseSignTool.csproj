@@ -77,6 +77,7 @@
     <ItemGroup>
         <ProjectReference Include="..\CoseHandler\CoseHandler.csproj" />
         <ProjectReference Include="..\CoseSign1.Certificates\CoseSign1.Certificates.csproj" />
+        <ProjectReference Include="..\CoseSign1.Certificates.AzureArtifactSigning\CoseSign1.Certificates.AzureArtifactSigning.csproj" />
         <ProjectReference Include="..\CoseSign1.Headers\CoseSign1.Headers.csproj" />
         <ProjectReference Include="..\CoseSign1.Transparent.MST\CoseSign1.Transparent.MST.csproj" />
         <ProjectReference Include="..\CoseSignTool.Abstractions\CoseSignTool.Abstractions.csproj" />

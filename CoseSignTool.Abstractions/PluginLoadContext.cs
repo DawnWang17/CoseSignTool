@@ -101,7 +101,18 @@ public class PluginLoadContext : AssemblyLoadContext
             "CoseSignTool.Abstractions", // Always use the main version
             "CoseHandler",               // Shared components
             "CoseSign1",
-            "CoseIndirectSignature"
+            "CoseIndirectSignature",
+            // Azure SDK assemblies that are referenced by shared CoseSign1.* assemblies
+            // and whose types cross the plugin/host boundary. They MUST load in the same
+            // AssemblyLoadContext as the shared assemblies that reference them, otherwise
+            // type identity mismatches cause MissingMethodException at runtime
+            // (e.g., CoseSign1.Transparent.MST.MstClientOptionsExtensions binds to the
+            // host-context CodeTransparencyClientOptions, but a plugin would otherwise
+            // construct a plugin-context instance — the two are distinct types).
+            "Azure.Security.CodeTransparency",
+            "Azure.CodeSigning",
+            "Azure.Developer.ArtifactSigning",
+            "Azure.Core"
         ];
 
         return sharedPrefixes.Any(prefix => assemblyName.Name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));

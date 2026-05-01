@@ -114,7 +114,15 @@ public class PluginLoadContextBasicTests
                 "Microsoft.Extensions.Logging",
                 "CoseSignTool.Abstractions",
                 "CoseHandler",
-                "System"
+                "System",
+                // Azure SDK assemblies whose types cross the plugin/host boundary via shared
+                // CoseSign1.* helpers (CoseSign1.Transparent.MST + CoseSign1.Certificates.AzureArtifactSigning).
+                // Loading them in the plugin context would create distinct type identities and
+                // produce MissingMethodException at runtime.
+                "Azure.Core",
+                "Azure.Security.CodeTransparency",
+                "Azure.CodeSigning",
+                "Azure.Developer.ArtifactSigning.CryptoProvider"
             };
 
             foreach (string assemblyName in sharedAssemblies)

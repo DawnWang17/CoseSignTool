@@ -24,11 +24,25 @@ public abstract class MstCommandBase : PluginCommandBase
     {
         { "endpoint", "The Microsoft's Signing Transparency (MST) service endpoint URL" },
         { "token-env", "The name of the environment variable containing the access token (default: MST_TOKEN)" },
+        { "azure-auth", "When set, fall back to Azure DefaultAzureCredential (CLI/MSI/etc.) if no access token is provided. Default behaviour is anonymous (suitable for unauthenticated MST instances)." },
         { "payload", "The file path to the payload file" },
         { "signature", "The file path to the COSE Sign1 signature file" },
         { "output", "The file path where the result will be written (optional)" },
         { "timeout", "Timeout in seconds for the operation (default: 30)" }
     };
+
+    /// <summary>
+    /// Pre-allocated single-element collection of boolean option names exposed by all MST commands.
+    /// Hoisted to <c>static readonly</c> so each command instance does not allocate its own array.
+    /// </summary>
+    private static readonly string[] BooleanOptionsArray = new[] { "azure-auth" };
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// <c>azure-auth</c> is a boolean flag that opts into Azure <c>DefaultAzureCredential</c> when no
+    /// explicit access token is supplied. It can be passed without a value (e.g., <c>--azure-auth</c>).
+    /// </remarks>
+    public override IReadOnlyCollection<string> BooleanOptions => BooleanOptionsArray;
 
     /// <summary>
     /// Validates common parameters and returns parsed timeout value.
@@ -166,6 +180,12 @@ public abstract class MstCommandBase : PluginCommandBase
             FileNotFoundException fileEx => 
                 HandleError($"File not found - {fileEx.Message}", PluginExitCode.UserSpecifiedFileNotFound, logger),
             
+            // Auth-configuration errors (e.g., explicit --token-env name with missing/whitespace value)
+            // surface as InvalidOperationException from CodeTransparencyClientHelper. Map them to
+            // InvalidArgumentValue so the operator gets a semantic exit code rather than UnknownError.
+            InvalidOperationException invOpEx =>
+                HandleError(invOpEx.Message, PluginExitCode.InvalidArgumentValue, logger),
+
             OperationCanceledException when cancellationToken.IsCancellationRequested => 
                 HandleError("Operation was cancelled.", PluginExitCode.UnknownError, logger),
             
@@ -188,11 +208,13 @@ public abstract class MstCommandBase : PluginCommandBase
     /// </summary>
     /// <param name="endpoint">The CTS endpoint URL.</param>
     /// <param name="tokenEnvVarName">Name of the environment variable containing the access token.</param>
+    /// <param name="useAzureAuth">When true, fall back to Azure DefaultAzureCredential if no token is set.</param>
+    /// <param name="logger">Optional logger used to record which auth path was selected.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Configured CodeTransparencyClient.</returns>
-    protected static Task<CodeTransparencyClient> CreateCtsClient(string endpoint, string? tokenEnvVarName, CancellationToken cancellationToken)
+    protected static Task<CodeTransparencyClient> CreateCtsClient(string endpoint, string? tokenEnvVarName, bool useAzureAuth, IPluginLogger? logger, CancellationToken cancellationToken)
     {
-        return CodeTransparencyClientHelper.CreateClientAsync(endpoint, tokenEnvVarName, cancellationToken);
+        return CodeTransparencyClientHelper.CreateClientAsync(endpoint, tokenEnvVarName, useAzureAuth, logger, cancellationToken);
     }
 
     /// <summary>
@@ -217,6 +239,7 @@ public abstract class MstCommandBase : PluginCommandBase
             // Get optional parameters
             string? tokenEnvVarName = GetOptionalValue(configuration, "token-env");
             string? outputPath = GetOptionalValue(configuration, "output");
+            bool useAzureAuth = GetBooleanFlag(configuration, "azure-auth");
 
             // Validate common parameters
             PluginExitCode validationResult = ValidateCommonParameters(configuration, out int timeoutSeconds, Logger);
@@ -248,11 +271,14 @@ public abstract class MstCommandBase : PluginCommandBase
                 return readResult;
             }
 
+            // Honour --timeout for the entire operation including auth acquisition (DefaultAzureCredential
+            // can hang on developer credentials, so the client construction must respect the timeout too).
+            using CancellationTokenSource combinedCts = CreateTimeoutCancellationToken(timeoutSeconds, cancellationToken);
+
             // Create CTS client
-            CodeTransparencyClient client = await CreateCtsClient(endpoint, tokenEnvVarName, cancellationToken);
+            CodeTransparencyClient client = await CreateCtsClient(endpoint, tokenEnvVarName, useAzureAuth, Logger, combinedCts.Token);
 
             // Execute the specific operation
-            using CancellationTokenSource combinedCts = CreateTimeoutCancellationToken(timeoutSeconds, cancellationToken);
             (PluginExitCode exitCode, object? result) operationResult = await ExecuteSpecificOperation(
                 client, message, signatureBytes, endpoint, payloadPath, signaturePath, 
                 configuration, combinedCts.Token);
@@ -316,8 +342,10 @@ public abstract class MstCommandBase : PluginCommandBase
                $"  --signature     The file path to the COSE Sign1 signature file{Environment.NewLine}" +
                $"{Environment.NewLine}" +
                $"Optional arguments:{Environment.NewLine}" +
-               $"  --token-env     Name of environment variable containing access token{Environment.NewLine}" +
-               $"                  (default: MST_TOKEN, uses default Azure credential if not specified){Environment.NewLine}" +
+               $"  --token-env     Name of environment variable containing access token (default: MST_TOKEN){Environment.NewLine}" +
+               $"  --azure-auth    Opt into Azure DefaultAzureCredential (CLI / managed identity / etc.){Environment.NewLine}" +
+               $"                  when no access token is supplied. Default behaviour is anonymous,{Environment.NewLine}" +
+               $"                  which is appropriate for unauthenticated MST instances (test ledgers).{Environment.NewLine}" +
                $"  --output        File path where {verb} result will be written{Environment.NewLine}";
     }
 
