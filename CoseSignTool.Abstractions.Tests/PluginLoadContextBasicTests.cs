@@ -95,7 +95,7 @@ public class PluginLoadContextBasicTests
     }
 
     /// <summary>
-    /// Tests that shared framework assemblies return null to allow default loading.
+    /// Tests that shared framework / curated contract assemblies return null to allow default loading.
     /// </summary>
     [TestMethod]
     public void Load_WithSharedFrameworkAssembly_ShouldReturnNull()
@@ -108,21 +108,20 @@ public class PluginLoadContextBasicTests
         
         try
         {
-            // Test various shared framework assemblies
+            // Test framework assemblies and the curated cross-boundary contract assemblies.
+            // Names like "CoseHandler", "CoseSign1.Certificates", and Azure SDK assemblies are
+            // intentionally NOT host-shared after the prefix-list cleanup — see
+            // PluginLoadContextAdvancedTests for the negative cases.
             string[] sharedAssemblies = {
                 "System.Collections",
                 "Microsoft.Extensions.Logging",
-                "CoseSignTool.Abstractions",
-                "CoseHandler",
                 "System",
-                // Azure SDK assemblies whose types cross the plugin/host boundary via shared
-                // CoseSign1.* helpers (CoseSign1.Transparent.MST + CoseSign1.Certificates.AzureArtifactSigning).
-                // Loading them in the plugin context would create distinct type identities and
-                // produce MissingMethodException at runtime.
-                "Azure.Core",
-                "Azure.Security.CodeTransparency",
-                "Azure.CodeSigning",
-                "Azure.Developer.ArtifactSigning.CryptoProvider"
+                "mscorlib",
+                "netstandard",
+                // Curated cross-boundary contracts:
+                "CoseSignTool.Abstractions",
+                "CoseSign1.Abstractions",
+                "CoseSign1.Headers",
             };
 
             foreach (string assemblyName in sharedAssemblies)
