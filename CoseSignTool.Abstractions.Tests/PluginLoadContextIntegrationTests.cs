@@ -212,7 +212,7 @@ public class PluginLoadContextIntegrationTests
         {
             // Act — capture stderr to confirm the plugin-local probe was attempted (proof that
             // the shared-list short-circuit did NOT consume this name).
-            StringWriter consoleOutput = new StringWriter();
+            using StringWriter consoleOutput = new StringWriter();
             TextWriter originalError = Console.Error;
             Console.SetError(consoleOutput);
 
@@ -232,7 +232,6 @@ public class PluginLoadContextIntegrationTests
             finally
             {
                 Console.SetError(originalError);
-                consoleOutput.Dispose();
             }
         }
         finally
@@ -264,7 +263,7 @@ public class PluginLoadContextIntegrationTests
 
         try
         {
-            StringWriter consoleOutput = new StringWriter();
+            using StringWriter consoleOutput = new StringWriter();
             TextWriter originalError = Console.Error;
             Console.SetError(consoleOutput);
 
@@ -284,7 +283,6 @@ public class PluginLoadContextIntegrationTests
             finally
             {
                 Console.SetError(originalError);
-                consoleOutput.Dispose();
             }
         }
         finally
