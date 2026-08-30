@@ -47,7 +47,7 @@ public static class CborHeaderHelper
     /// <example>
     /// <code>
     /// // Adds protected header 4242 carrying a CBOR byte string.
-    /// CborHeaderHelper.CreateHeaderExtender(new[] { "4242=RgABAgME" }, null);
+    /// CborHeaderHelper.CreateHeaderExtender(new[] { "4242=RAECAwQ=" }, null);
     /// </code>
     /// </example>
     public static CoseHeaderExtender? CreateHeaderExtender(

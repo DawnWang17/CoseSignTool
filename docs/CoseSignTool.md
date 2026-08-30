@@ -210,8 +210,8 @@ cat mycert.crt mykey.pem > combined.pem
         * **--StringProtectedHeaders**, **--sph** - A collection of name-value pairs (separated by comma ',') with the value being a string. Example: `--sph message-type="cose",customer-name="contoso"`
         * **--IntUnProtectedHeaders**, **--iuh** - A collection of name-value pairs (separated by comma ',') with the value being an int32. Example: `--iuh created-at=12345678,customer-count=10`
         * **--StringUnProtectedHeaders**, **--suh** - A collection of name-value pairs (separated by comma ',') with the value being a string. Example: `--suh message-type="cose",customer-name="contoso"`
-        * **--CborProtectedHeaders**, **--cbph** - A collection of label-value pairs (separated by comma ',') where the value is base64-encoded CBOR placed in the protected header verbatim. Example: `--cbph vendor-signature=RgABAgME`
-        * **--CborUnProtectedHeaders**, **--cbuh** - The same as `--cbph`, but for the un-protected header. Example: `--cbuh 4242=RgABAgME`
+        * **--CborProtectedHeaders**, **--cbph** - A collection of label-value pairs (separated by comma ',') where the value is base64-encoded CBOR placed in the protected header verbatim. Example: `--cbph vendor-signature=RAECAwQ=`
+        * **--CborUnProtectedHeaders**, **--cbuh** - The same as `--cbph`, but for the un-protected header. Example: `--cbuh 4242=RAECAwQ=`
     * File:
         * **--IntHeaders**, **--ih** - A JSON file containing the headers with the value being an int32.
         * **--StringHeaders**, **--sh** - A JSON file containing the headers with the value being a string.
@@ -262,7 +262,7 @@ The int and string header options encode their values on your behalf, which cann
 
 ```bash
 CoseSignTool sign --payload app.bin --signature app.cose --pfx cert.pfx \
-  --CborProtectedHeaders vendor-signature=RgABAgME
+  --CborProtectedHeaders vendor-signature=RAECAwQ=
 ```
 
 ### Hash Algorithm:

@@ -1,4 +1,4 @@
-﻿// Copyright (c) Microsoft Corporation.
+// Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
 namespace CoseSignTool;
@@ -1486,10 +1486,10 @@ Advanced Options:
         --CborProtectedHeaders, -cbph: A collection of protected headers whose values are already CBOR encoded and
             supplied as base64. Use this to carry an existing signature or other opaque CBOR structure in its own
             protected header. Labels may be integers or strings.
-            Sample input: --cbph 4242=RgABAgME,vendor-signature=RgABAgME
+            Sample input: --cbph 4242=RAECAwQ=,vendor-signature=RAECAwQ=
 
         --CborUnProtectedHeaders, -cbuh: The same as --CborProtectedHeaders, but the headers are unprotected.
-            Sample input: --cbuh 4242=RgABAgME
+            Sample input: --cbuh 4242=RAECAwQ=
 
     Options to customize the signing operation:
         --HashAlgorithm, -ha: The hash algorithm used to sign. Supported values are SHA256 (default), SHA384 and SHA512.
