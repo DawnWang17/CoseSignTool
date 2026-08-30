@@ -99,6 +99,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Azure.Core.TestCommon", "Az
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoseSignTool.AzureArtifactSigning.Plugin.Tests", "CoseSignTool.AzureArtifactSigning.Plugin.Tests\CoseSignTool.AzureArtifactSigning.Plugin.Tests.csproj", "{02763B01-6FA0-420C-BC5B-C6DCB3E20219}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoseSignTool.AasMst.Plugin", "CoseSignTool.AasMst.Plugin\CoseSignTool.AasMst.Plugin.csproj", "{F4036D6F-0137-4151-91E7-8649E172EFCE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CoseSignTool.AasMst.Plugin.Tests", "CoseSignTool.AasMst.Plugin.Tests\CoseSignTool.AasMst.Plugin.Tests.csproj", "{C3F82907-B2CE-45AF-8B87-601AECE68434}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -575,6 +579,38 @@ Global
 		{02763B01-6FA0-420C-BC5B-C6DCB3E20219}.Release|x64.Build.0 = Release|Any CPU
 		{02763B01-6FA0-420C-BC5B-C6DCB3E20219}.Release|x86.ActiveCfg = Release|Any CPU
 		{02763B01-6FA0-420C-BC5B-C6DCB3E20219}.Release|x86.Build.0 = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|x64.Build.0 = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Debug|x86.Build.0 = Debug|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|ARM64.Build.0 = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|x64.ActiveCfg = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|x64.Build.0 = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|x86.ActiveCfg = Release|Any CPU
+		{F4036D6F-0137-4151-91E7-8649E172EFCE}.Release|x86.Build.0 = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|x64.Build.0 = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Debug|x86.Build.0 = Debug|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|ARM64.Build.0 = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|x64.ActiveCfg = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|x64.Build.0 = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|x86.ActiveCfg = Release|Any CPU
+		{C3F82907-B2CE-45AF-8B87-601AECE68434}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
