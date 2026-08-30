@@ -25,6 +25,12 @@ CoseSignTool --help
 # Use a plugin command (example: Azure CTS)
 export MST_TOKEN="your-access-token"
 CoseSignTool mst_register --endpoint https://your-mst.azure.com --payload file.txt --signature file.txt.cose
+
+# Register with MST through the Azure Artifact Signing proxy instead, reusing the
+# same account and certificate profile that authorized signing
+CoseSignTool aas_mst_register --endpoint https://wus.codesigning.azure.net \
+  --account-name testwus --cert-profile-name testWusCert1 \
+  --payload file.txt --signature file.txt.cose
 ```
 
 **For Developers:**
@@ -33,6 +39,7 @@ CoseSignTool mst_register --endpoint https://your-mst.azure.com --payload file.t
 - See [PluginQuickStart.md](PluginQuickStart.md) for a quick start guide
 - See [PluginExamples.md](PluginExamples.md) for example plugin implementations
 - See [MST.md](MST.md) for Microsoft's Signing Transparency plugin documentation
+- See [AasMst.md](AasMst.md) for registering with MST through the Azure Artifact Signing proxy
 
 ## Concepts to know before you start
 * **Payload**: We use the term "Payload" to describe the content that is or will be signed. This might be a file or an object in memory.

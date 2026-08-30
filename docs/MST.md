@@ -11,6 +11,10 @@ The MST plugin (`CoseSignTool.MST.Plugin`) extends CoseSignTool with commands to
 - `mst_register` - Register a COSE Sign1 signature with MST
 - `mst_verify` - Verify a COSE Sign1 signature against MST
 
+> **Registering through Azure Artifact Signing:** To register with MST using an Azure Artifact
+> Signing account and certificate profile for authorization — rather than a credential the MST
+> ledger recognizes directly — use the `aas_mst_register` command described in [AasMst.md](AasMst.md).
+
 ## Installation
 
 The MST plugin is automatically included with CoseSignTool releases using the enhanced subdirectory architecture for dependency isolation. No additional installation is required.
