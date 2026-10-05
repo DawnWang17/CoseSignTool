@@ -8,11 +8,14 @@ extern alias IdentityAlias;
 namespace CoseSignTool.AzureArtifactSigning.Plugin;
 
 using System.Security.Cryptography;
+using System.Security.Cryptography.Cose;
 using Azure;
 using Azure.ArtifactSigning.MST;
 using Azure.Core;
+using CoseSign1;
 using CoseSign1.Abstractions.Exceptions;
 using CoseSign1.Abstractions.Interfaces;
+using CoseSign1.Transparent.Extensions;
 using CoseSignTool.Abstractions;
 using CoseSignTool.Abstractions.Helpers;
 using Microsoft.Extensions.Configuration;
@@ -70,7 +73,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
 
     /// <inheritdoc/>
     public override string Usage =>
-        "CoseSignTool aas_sign_mst_register --endpoint <mst-ledger-url> --proxy-endpoint <aas-proxy-url> " +
+        "CoseSignTool aas_sign_mst_register --mst-instance-name <name> --proxy-endpoint <aas-proxy-url> " +
         "--aas-endpoint <aas-signing-url> --aas-account-name <name> --aas-cert-profile-name <name> " +
         "--payload <file> --signature <statement-output-file> [--output <result-file>] " +
         "[--hash-algorithm <SHA256|SHA384|SHA512>] [--rsa-signature-padding <PSS|PKCS1>] " +
@@ -84,25 +87,23 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
         {
             Dictionary<string, string> options = new(StringComparer.OrdinalIgnoreCase)
             {
-                ["endpoint"] = "Microsoft Signing Transparency ledger endpoint URL (required)",
+                ["mst-instance-name"] = "Microsoft Signing Transparency instance name (required)",
                 ["proxy-endpoint"] = "Azure Artifact Signing MST proxy endpoint URL (required)",
                 ["aas-endpoint"] = "Azure Artifact Signing endpoint URL used to sign the payload (required)",
                 ["aas-account-name"] = "Azure Artifact Signing account name (required)",
                 ["aas-cert-profile-name"] = "Azure Artifact Signing certificate profile name (required)",
                 ["payload"] = "Path to the payload file to sign (required)",
-                ["signature"] = "Path where the generated embedded COSE Sign1 statement is written (required)",
+                ["signature"] = "Path where the transparent COSE Sign1 statement is written (required)",
                 ["output"] = "Optional path for the JSON registration result",
-                ["timeout"] = "Combined signing and MST registration timeout in seconds (default: 30)",
+                ["timeout"] = "Combined signing and MST registration timeout in seconds (default: 60)",
                 ["correlation-id"] = "Optional correlation ID sent to Azure Artifact Signing",
                 ["aas-exclude-credentials"] = "Comma-separated DefaultAzureCredential implementations to exclude",
                 ["cbor-protected-headers"] = CoseHeaderHelper.HeaderOptions["cbor-protected-headers"],
                 ["cbor-unprotected-headers"] = CoseHeaderHelper.HeaderOptions["cbor-unprotected-headers"],
             };
 
-            foreach (KeyValuePair<string, string> option in CoseSigningAlgorithmHelper.SigningOptions)
-            {
-                options.Add(option.Key, option.Value);
-            }
+            options.Add("hash-algorithm", "The hash algorithm to use (SHA256, SHA384, or SHA512; default: SHA256)");
+            options.Add("rsa-signature-padding", "The RSA signature padding to use (PSS or PKCS1; default: PSS)");
 
             return options;
         }
@@ -115,7 +116,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
     {
         try
         {
-            string ledgerEndpoint = GetRequiredNonWhitespaceValue(configuration, "endpoint");
+            string mstInstanceName = GetRequiredNonWhitespaceValue(configuration, "mst-instance-name");
             string proxyEndpoint = GetRequiredNonWhitespaceValue(configuration, "proxy-endpoint");
             string aasEndpoint = GetRequiredNonWhitespaceValue(configuration, "aas-endpoint");
             string accountName = GetRequiredNonWhitespaceValue(configuration, "aas-account-name");
@@ -124,12 +125,6 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
             string signaturePath = GetRequiredNonWhitespaceValue(configuration, "signature");
             string? outputPath = GetOptionalValue(configuration, "output");
             string? correlationId = GetOptionalValue(configuration, "correlation-id");
-
-            if (!TryCreateHttpsEndpoint(ledgerEndpoint, out Uri? ledgerEndpointUri))
-            {
-                Logger.LogError("The Microsoft Signing Transparency endpoint must be an absolute HTTPS URL.");
-                return PluginExitCode.InvalidArgumentValue;
-            }
 
             if (!TryCreateHttpsEndpoint(proxyEndpoint, out Uri? proxyEndpointUri))
             {
@@ -162,8 +157,8 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
             RSASignaturePadding rsaSignaturePadding;
             try
             {
-                hashAlgorithm = CoseSigningAlgorithmHelper.GetHashAlgorithm(configuration);
-                rsaSignaturePadding = CoseSigningAlgorithmHelper.GetRsaSignaturePadding(configuration);
+                hashAlgorithm = ParseHashAlgorithm(configuration["hash-algorithm"]);
+                rsaSignaturePadding = ParseRsaSignaturePadding(configuration["rsa-signature-padding"]);
             }
             catch (InvalidOperationException ex)
             {
@@ -197,16 +192,13 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
             }
 
             byte[] statementBytes = statement.ToArray();
-            await File.WriteAllBytesAsync(signaturePath, statementBytes, linkedCts.Token).ConfigureAwait(false);
-            Logger.LogInformation($"COSE statement written to: {signaturePath}");
 
             Logger.LogInformation("Registering the generated COSE statement with MST through Azure Artifact Signing...");
-            Logger.LogVerbose($"  Ledger endpoint: {ledgerEndpointUri}");
+            Logger.LogVerbose($"  MST instance: {mstInstanceName}");
             Logger.LogVerbose($"  Proxy endpoint: {proxyEndpointUri}");
             Logger.LogVerbose($"  Signature: {signaturePath} ({statement.Length} bytes)");
 
             TransparencyClient client = this.transparencyClientFactory(proxyEndpointUri!, configuration, Logger);
-            string mstInstanceName = ledgerEndpointUri!.Host.Split('.')[0];
 
             using MemoryStream statementStream = new(statementBytes, writable: false);
             Response<Stream> response = await client.RegisterTransparencyAsync(
@@ -225,6 +217,17 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
                 receipt = receiptBuffer.ToArray();
             }
 
+            if (receipt.Length == 0)
+            {
+                throw new InvalidOperationException("Azure Artifact Signing returned an empty transparency receipt.");
+            }
+
+            CoseSign1Message transparentStatement = CoseMessage.DecodeSign1(statementBytes);
+            transparentStatement.AddReceipts(new List<byte[]> { receipt });
+            byte[] transparentStatementBytes = transparentStatement.Encode();
+            await File.WriteAllBytesAsync(signaturePath, transparentStatementBytes, linkedCts.Token).ConfigureAwait(false);
+
+            Logger.LogInformation($"Transparent COSE statement written to: {signaturePath}");
             Logger.LogInformation("Signing and registration through Azure Artifact Signing completed successfully.");
 
             if (!string.IsNullOrWhiteSpace(outputPath))
@@ -264,7 +267,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
         }
         catch (OperationCanceledException)
         {
-            Logger.LogError($"Operation timed out after {GetOptionalValue(configuration, "timeout", "30")} seconds.");
+            Logger.LogError($"Operation timed out after {GetOptionalValue(configuration, "timeout", "60")} seconds.");
             return PluginExitCode.UnknownError;
         }
         catch (RequestFailedException ex)
@@ -322,14 +325,21 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
     {
         AzureArtifactSigningCertificateProviderPlugin providerPlugin = new();
         ICoseSigningKeyProvider signingKeyProvider = providerPlugin.CreateProvider(configuration, logger);
-        return await CoseSigningAlgorithmHelper.SignPayloadAsync(
+        CoseSign1MessageFactory messageFactory = new();
+        CoseSign1MessageSigningOptions signingOptions = new()
+        {
+            HashAlgorithm = hashAlgorithm,
+            RsaSignaturePadding = rsaSignaturePadding,
+        };
+
+        return await messageFactory.CreateCoseSign1MessageBytesAsync(
             payload,
             signingKeyProvider,
             embedPayload: true,
-            headerExtender,
-            hashAlgorithm,
-            rsaSignaturePadding,
-            cancellationToken).ConfigureAwait(false);
+            contentType: CoseSign1MessageFactory.DEFAULT_CONTENT_TYPE,
+            headerExtender: headerExtender,
+            cancellationToken: cancellationToken,
+            signingOptions: signingOptions).ConfigureAwait(false);
     }
 
     private static TransparencyClient CreateTransparencyClient(
@@ -356,7 +366,31 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
 
     private static bool TryGetTimeout(IConfiguration configuration, out int timeoutSeconds)
     {
-        return int.TryParse(GetOptionalValue(configuration, "timeout", "30"), out timeoutSeconds)
+        return int.TryParse(GetOptionalValue(configuration, "timeout", "60"), out timeoutSeconds)
             && timeoutSeconds > 0;
+    }
+
+    private static HashAlgorithmName ParseHashAlgorithm(string? hashAlgorithm)
+    {
+        return (hashAlgorithm ?? HashAlgorithmName.SHA256.Name).ToUpperInvariant() switch
+        {
+            "SHA256" => HashAlgorithmName.SHA256,
+            "SHA384" => HashAlgorithmName.SHA384,
+            "SHA512" => HashAlgorithmName.SHA512,
+            _ => throw new InvalidOperationException(
+                $"Unsupported hash algorithm '{hashAlgorithm}'. Supported values are SHA256, SHA384, and SHA512."),
+        };
+    }
+
+    private static RSASignaturePadding ParseRsaSignaturePadding(string? rsaSignaturePadding)
+    {
+        string normalizedPadding = (rsaSignaturePadding ?? "PSS").Replace("-", string.Empty).ToUpperInvariant();
+        return normalizedPadding switch
+        {
+            "PSS" or "PS" => RSASignaturePadding.Pss,
+            "PKCS1" or "PKCS1V15" or "RS" => RSASignaturePadding.Pkcs1,
+            _ => throw new InvalidOperationException(
+                $"Unsupported RSA signature padding '{rsaSignaturePadding}'. Supported values are PSS and PKCS1."),
+        };
     }
 }

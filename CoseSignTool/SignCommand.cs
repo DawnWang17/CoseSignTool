@@ -372,15 +372,20 @@ public class SignCommand : CoseCommand
             using CancellationTokenSource timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(MaxWaitTime));
 
             // Generate the COSE signature asynchronously with cancellation support.
-            ReadOnlyMemory<byte> signedBytes = CoseSigningAlgorithmHelper.SignPayloadAsync(
+            CoseSign1MessageFactory messageFactory = new();
+            CoseSign1MessageSigningOptions signingOptions = new()
+            {
+                HashAlgorithm = HashAlgorithm,
+                RsaSignaturePadding = RsaSignaturePadding,
+            };
+            ReadOnlyMemory<byte> signedBytes = messageFactory.CreateCoseSign1MessageBytesAsync(
                 payloadStream,
                 signingKeyProvider,
                 EmbedPayload,
+                ContentType ?? CoseSign1MessageFactory.DEFAULT_CONTENT_TYPE,
                 headerExtender,
-                HashAlgorithm,
-                RsaSignaturePadding,
                 timeoutCts.Token,
-                ContentType ?? CoseSign1MessageFactory.DEFAULT_CONTENT_TYPE).ConfigureAwait(false).GetAwaiter().GetResult();
+                signingOptions).ConfigureAwait(false).GetAwaiter().GetResult();
 
             // Write the signature to stream or file.
             if (PipeOutput)
@@ -497,12 +502,26 @@ public class SignCommand : CoseCommand
 
     private static HashAlgorithmName ParseHashAlgorithm(string? hashAlgorithm)
     {
-        return CoseSigningAlgorithmHelper.ParseHashAlgorithm(hashAlgorithm);
+        return hashAlgorithm?.ToUpperInvariant() switch
+        {
+            "SHA256" => HashAlgorithmName.SHA256,
+            "SHA384" => HashAlgorithmName.SHA384,
+            "SHA512" => HashAlgorithmName.SHA512,
+            _ => throw new InvalidOperationException(
+                $"Unsupported hash algorithm '{hashAlgorithm}'. Supported values are SHA256, SHA384, and SHA512.")
+        };
     }
 
     private static RSASignaturePadding ParseRsaSignaturePadding(string? rsaSignaturePadding)
     {
-        return CoseSigningAlgorithmHelper.ParseRsaSignaturePadding(rsaSignaturePadding);
+        string normalizedPadding = rsaSignaturePadding?.Replace("-", string.Empty).ToUpperInvariant() ?? string.Empty;
+        return normalizedPadding switch
+        {
+            "PSS" or "PS" => RSASignaturePadding.Pss,
+            "PKCS1" or "PKCS1V15" or "RS" => RSASignaturePadding.Pkcs1,
+            _ => throw new InvalidOperationException(
+                $"Unsupported RSA signature padding '{rsaSignaturePadding}'. Supported values are PSS and PKCS1.")
+        };
     }
 
     /// <summary>

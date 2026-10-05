@@ -5,10 +5,10 @@ namespace CoseSignTool.AzureArtifactSigning.Plugin.Tests;
 
 using System.Security.Cryptography;
 using System.Security.Cryptography.Cose;
-using System.Text.Json;
 using Azure;
 using Azure.ArtifactSigning.MST;
 using CoseSign1.Abstractions.Interfaces;
+using CoseSign1.Transparent.Extensions;
 using CoseSignTool.Abstractions;
 using CoseSignTool.AzureArtifactSigning.Plugin;
 using Microsoft.Extensions.Configuration;
@@ -46,7 +46,7 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
     {
         AzureArtifactSigningSignMstRegisterCommand command = new();
 
-        Assert.IsTrue(command.Options.ContainsKey("endpoint"));
+        Assert.IsTrue(command.Options.ContainsKey("mst-instance-name"));
         Assert.IsTrue(command.Options.ContainsKey("proxy-endpoint"));
         Assert.IsTrue(command.Options.ContainsKey("aas-endpoint"));
         Assert.IsTrue(command.Options.ContainsKey("aas-account-name"));
@@ -62,16 +62,17 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
     }
 
     /// <summary>
-    /// Verifies that signing happens first and the exact generated statement is written and registered.
+    /// Verifies that the original statement is registered and the persisted statement contains the returned receipt.
     /// </summary>
     [TestMethod]
-    public async Task ExecuteAsync_WithValidArguments_SignsWritesAndRegistersSameStatement()
+    public async Task ExecuteAsync_WithValidArguments_RegistersOriginalAndWritesTransparentStatement()
     {
-        byte[] statementBytes = new byte[] { 0xD2, 0x84, 0x40, 0xA0, 0x40, 0x40 };
+        using RSA rsa = RSA.Create(2048);
+        CoseSigner signer = new(rsa, RSASignaturePadding.Pss, HashAlgorithmName.SHA256);
+        byte[] statementBytes = CoseSign1Message.SignEmbedded("payload"u8.ToArray(), signer);
         byte[] receiptBytes = new byte[] { 0xD8, 0x63, 0x81, 0x01 };
         string payloadPath = Path.GetTempFileName();
         string signaturePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.cose");
-        string outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
         RecordingTransparencyClient client = new(receiptBytes);
         byte[]? signedPayload = null;
         HashAlgorithmName capturedHashAlgorithm = default;
@@ -92,7 +93,6 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
         IConfigurationRoot configuration = CreateConfiguration(
             payloadPath,
             signaturePath,
-            outputPath,
             correlationId: "test-correlation-id",
             hashAlgorithm: "SHA384",
             rsaSignaturePadding: "PKCS1",
@@ -107,7 +107,6 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
 
             Assert.AreEqual(PluginExitCode.Success, result);
             CollectionAssert.AreEqual(payloadBytes, signedPayload);
-            CollectionAssert.AreEqual(statementBytes, await File.ReadAllBytesAsync(signaturePath));
             CollectionAssert.AreEqual(statementBytes, client.SubmittedData);
             Assert.AreEqual("test-account", client.AccountName);
             Assert.AreEqual("test-profile", client.CertificateProfileName);
@@ -121,16 +120,51 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
                 new byte[] { 0x44, 0x01, 0x02, 0x03, 0x04 },
                 protectedHeaders[new CoseHeaderLabel("external-signatures")].EncodedValue.ToArray());
 
-            using JsonDocument output = JsonDocument.Parse(await File.ReadAllTextAsync(outputPath));
-            Assert.AreEqual(
-                Convert.ToBase64String(receiptBytes),
-                output.RootElement.GetProperty("TransparencyReceipt").GetString());
+            byte[] transparentStatementBytes = await File.ReadAllBytesAsync(signaturePath);
+            CoseSign1Message transparentStatement = CoseMessage.DecodeSign1(transparentStatementBytes);
+            Assert.IsTrue(transparentStatement.TryGetReceipts(out List<byte[]>? receipts));
+            Assert.AreEqual(1, receipts!.Count);
+            CollectionAssert.AreEqual(receiptBytes, receipts[0]);
         }
         finally
         {
             File.Delete(payloadPath);
             File.Delete(signaturePath);
-            File.Delete(outputPath);
+        }
+    }
+
+    /// <summary>
+    /// Verifies that registration failure does not leave a non-transparent statement at the output path.
+    /// </summary>
+    [TestMethod]
+    public async Task ExecuteAsync_WhenRegistrationFails_DoesNotWriteStatement()
+    {
+        using RSA rsa = RSA.Create(2048);
+        CoseSigner signer = new(rsa, RSASignaturePadding.Pss, HashAlgorithmName.SHA256);
+        byte[] statementBytes = CoseSign1Message.SignEmbedded("payload"u8.ToArray(), signer);
+        string payloadPath = Path.GetTempFileName();
+        string signaturePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.cose");
+        RecordingTransparencyClient client = new(
+            new RequestFailedException(500, "Registration failed.", "InternalServerError", null));
+        AzureArtifactSigningSignMstRegisterCommand command = new(
+            (_, _, _) => client,
+            (_, _, _, _, _, _, _) => Task.FromResult<ReadOnlyMemory<byte>>(statementBytes));
+        IConfigurationRoot configuration = CreateConfiguration(payloadPath, signaturePath);
+
+        try
+        {
+            await File.WriteAllTextAsync(payloadPath, "payload");
+
+            PluginExitCode result = await command.ExecuteAsync(configuration);
+
+            Assert.AreEqual(PluginExitCode.UnknownError, result);
+            CollectionAssert.AreEqual(statementBytes, client.SubmittedData);
+            Assert.IsFalse(File.Exists(signaturePath));
+        }
+        finally
+        {
+            File.Delete(payloadPath);
+            File.Delete(signaturePath);
         }
     }
 
@@ -186,7 +220,7 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
         IConfigurationRoot configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["endpoint"] = "https://debugruisuprivatetrust.confidential-ledger.azure.com",
+                ["mst-instance-name"] = "debugruisuprivatetrust",
                 ["proxy-endpoint"] = ProxyEndpoint,
                 ["aas-endpoint"] = AasEndpoint,
                 ["aas-cert-profile-name"] = "test-profile",
@@ -332,7 +366,7 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
         return new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["endpoint"] = "https://debugruisuprivatetrust.confidential-ledger.azure.com",
+                ["mst-instance-name"] = "debugruisuprivatetrust",
                 ["proxy-endpoint"] = proxyEndpoint,
                 ["aas-endpoint"] = aasEndpoint,
                 ["aas-account-name"] = "test-account",
@@ -352,11 +386,17 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
 
     private sealed class RecordingTransparencyClient : TransparencyClient
     {
-        private readonly byte[] receipt;
+        private readonly byte[]? receipt;
+        private readonly RequestFailedException? exception;
 
         public RecordingTransparencyClient(byte[] receipt)
         {
             this.receipt = receipt;
+        }
+
+        public RecordingTransparencyClient(RequestFailedException exception)
+        {
+            this.exception = exception;
         }
 
         public string? AccountName { get; private set; }
@@ -385,8 +425,13 @@ public class AzureArtifactSigningSignMstRegisterCommandTests
             this.CorrelationId = xCorrelationId;
             this.SubmittedData = submittedData.ToArray();
 
+            if (this.exception is not null)
+            {
+                throw this.exception;
+            }
+
             return Response.FromValue<Stream>(
-                new MemoryStream(this.receipt, writable: false),
+                new MemoryStream(this.receipt!, writable: false),
                 Mock.Of<Response>());
         }
     }

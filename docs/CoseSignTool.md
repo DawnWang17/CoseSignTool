@@ -27,7 +27,7 @@ export MST_TOKEN="your-access-token"
 CoseSignTool mst_register --endpoint https://your-mst.azure.com --payload file.txt --signature file.txt.cose
 
 # Sign and register with MST through the Azure Artifact Signing plugin
-CoseSignTool aas_sign_mst_register --endpoint https://your-mst.azure.com \
+CoseSignTool aas_sign_mst_register --mst-instance-name your-mst \
     --proxy-endpoint https://api-canary.northcentralus.codesigning.azure.net/ \
     --aas-endpoint https://contoso.codesigning.azure.net/ \
     --aas-account-name MyAccount --aas-cert-profile-name MyProfile \

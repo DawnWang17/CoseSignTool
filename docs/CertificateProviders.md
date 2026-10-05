@@ -269,9 +269,10 @@ re-authenticating each time.
 #### Signing and registering with MST through Azure Artifact Signing
 
 The Azure Artifact Signing plugin also provides `aas_sign_mst_register`. This command signs the
-payload with Azure Artifact Signing, writes an embedded-payload COSE Sign1 statement, and immediately
-sends those exact statement bytes to the Azure Artifact Signing MST proxy. The generic MST plugin and
-its `mst_register` command are unchanged.
+payload with Azure Artifact Signing, sends the original embedded-payload COSE Sign1 statement to the
+Azure Artifact Signing MST proxy, embeds the returned receipt in unprotected header `394`, and writes
+the resulting transparent statement. If registration fails, no statement is written. The generic MST
+plugin and its `mst_register` command are unchanged.
 
 The plugin owns the complete sign-and-register workflow. It obtains the Artifact Signing key provider,
 creates the embedded COSE Sign1 statement through the shared CoseSign1 factory, and uses the same
@@ -279,7 +280,7 @@ generic hash, RSA padding, and CBOR-header helpers as other signing commands.
 
 ```bash
 CoseSignTool aas_sign_mst_register \
-  --endpoint https://your-mst.confidential-ledger.azure.com \
+  --mst-instance-name your-mst \
   --proxy-endpoint https://api-canary.northcentralus.codesigning.azure.net/ \
   --aas-endpoint https://contoso.codesigning.azure.net/ \
   --aas-account-name ContosoAccount \
@@ -295,19 +296,19 @@ CoseSignTool aas_sign_mst_register \
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
-| `--endpoint` | Yes | Microsoft Signing Transparency ledger endpoint. |
+| `--mst-instance-name` | Yes | Microsoft Signing Transparency instance name passed to the proxy. |
 | `--proxy-endpoint` | Yes | Azure Artifact Signing proxy endpoint. |
 | `--aas-endpoint` | Yes | Azure Artifact Signing endpoint used to sign the payload. |
 | `--aas-account-name` | Yes | Azure Artifact Signing account name. |
 | `--aas-cert-profile-name` | Yes | Certificate profile used for signing and proxy authorization. |
 | `--payload` | Yes | Payload file to sign. |
-| `--signature` | Yes | Output path for the generated embedded COSE Sign1 statement. |
+| `--signature` | Yes | Output path for the transparent COSE Sign1 statement containing the receipt. |
 | `--hash-algorithm` | No | Generic signing hash: SHA256, SHA384, or SHA512. |
 | `--rsa-signature-padding` | No | Generic RSA padding: PSS or PKCS1. |
 | `--cbor-protected-headers` | No | Generic protected headers whose values are base64-encoded complete CBOR data items. |
 | `--cbor-unprotected-headers` | No | Generic unprotected headers whose values are base64-encoded complete CBOR data items. |
 | `--output` | No | JSON output file containing the transparency receipt. |
-| `--timeout` | No | Combined signing and MST registration timeout in seconds; defaults to 30. |
+| `--timeout` | No | Combined signing and MST registration timeout in seconds; defaults to 60. |
 | `--correlation-id` | No | Correlation ID sent to Azure Artifact Signing. |
 | `--aas-exclude-credentials` | No | Credentials excluded from the shared Artifact Signing credential chain. |
 

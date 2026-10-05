@@ -16,7 +16,6 @@
     <SignAssembly>true</SignAssembly>
     <DelaySign>True</DelaySign>
     <AssemblyOriginatorKeyFile>..\StrongNameKeys\35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
-    <RestoreAdditionalProjectSources>https://pkgs.dev.azure.com/prssdev/AzureCodeSign/_packaging/Prod-RW-ACS/nuget/v3/index.json</RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CoseSign1.Transparent\CoseSign1.Transparent.csproj" />
     <ProjectReference Include="..\CoseSignTool.Abstractions\CoseSignTool.Abstractions.csproj" />
     <ProjectReference Include="..\CoseSignTool.AzureArtifactSigning.Plugin\CoseSignTool.AzureArtifactSigning.Plugin.csproj" />
   </ItemGroup>

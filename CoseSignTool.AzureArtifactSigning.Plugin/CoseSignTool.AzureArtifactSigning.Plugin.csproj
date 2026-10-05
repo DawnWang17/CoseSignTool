@@ -16,8 +16,6 @@
     <SignAssembly>true</SignAssembly>
     <DelaySign>True</DelaySign>
     <AssemblyOriginatorKeyFile>..\StrongNameKeys\35MSSharedLib1024.snk</AssemblyOriginatorKeyFile>
-    <RestoreAdditionalProjectSources>https://pkgs.dev.azure.com/prssdev/AzureCodeSign/_packaging/Prod-RW-ACS/nuget/v3/index.json</RestoreAdditionalProjectSources>
-
     <!-- Plugin-specific properties to ensure all dependencies are copied for subdirectory isolation -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <PreserveCompilationContext>true</PreserveCompilationContext>
@@ -34,6 +32,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CoseSign1\CoseSign1.csproj">
+      <Private>true</Private>
+      <ExcludeAssets>none</ExcludeAssets>
+      <IncludeAssets>compile; build; native; contentfiles; analyzers</IncludeAssets>
+    </ProjectReference>
+    <ProjectReference Include="..\CoseSign1.Transparent\CoseSign1.Transparent.csproj">
+      <Private>true</Private>
+      <ExcludeAssets>none</ExcludeAssets>
+      <IncludeAssets>compile; build; native; contentfiles; analyzers</IncludeAssets>
+    </ProjectReference>
     <ProjectReference Include="..\CoseSignTool.Abstractions\CoseSignTool.Abstractions.csproj">
       <Private>true</Private>
       <ExcludeAssets>none</ExcludeAssets>
@@ -59,8 +67,9 @@
     <PackageReference Include="Azure.Core" VersionOverride="1.62.0">
       <Private>true</Private>
     </PackageReference>
+    <!-- This type crosses plugin interfaces, so the plugin must use the host's assembly instance. -->
     <PackageReference Include="System.Security.Cryptography.Cose">
-      <Private>true</Private>
+      <ExcludeAssets>runtime</ExcludeAssets>
     </PackageReference>
   </ItemGroup>
 
