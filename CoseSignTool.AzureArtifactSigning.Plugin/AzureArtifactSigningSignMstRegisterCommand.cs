@@ -33,6 +33,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
         Stream,
         IConfiguration,
         IPluginLogger,
+        string,
         HashAlgorithmName,
         RSASignaturePadding,
         ICoseHeaderExtender?,
@@ -53,6 +54,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
             Stream,
             IConfiguration,
             IPluginLogger,
+            string,
             HashAlgorithmName,
             RSASignaturePadding,
             ICoseHeaderExtender?,
@@ -76,6 +78,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
         "CoseSignTool aas_sign_mst_register --mst-instance-name <name> --proxy-endpoint <aas-proxy-url> " +
         "--aas-endpoint <aas-signing-url> --aas-account-name <name> --aas-cert-profile-name <name> " +
         "--payload <file> --signature <statement-output-file> [--output <result-file>] " +
+        "[--ContentType <media-type>] " +
         "[--hash-algorithm <SHA256|SHA384|SHA512>] [--rsa-signature-padding <PSS|PKCS1>] " +
         "[--cbor-protected-headers <label=base64-cbor>] " +
         "[--timeout <seconds>] [--correlation-id <id>] [--aas-exclude-credentials <names>]";
@@ -98,6 +101,8 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
                 ["timeout"] = "Combined signing and MST registration timeout in seconds (default: 60)",
                 ["correlation-id"] = "Optional correlation ID sent to Azure Artifact Signing",
                 ["aas-exclude-credentials"] = "Comma-separated DefaultAzureCredential implementations to exclude",
+                ["ContentType"] = "MIME type to set in the COSE protected header (default: application/cose)",
+                ["cty"] = "Alias for --ContentType",
                 ["cbor-protected-headers"] = CoseHeaderHelper.HeaderOptions["cbor-protected-headers"],
                 ["cbor-unprotected-headers"] = CoseHeaderHelper.HeaderOptions["cbor-unprotected-headers"],
             };
@@ -125,6 +130,11 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
             string signaturePath = GetRequiredNonWhitespaceValue(configuration, "signature");
             string? outputPath = GetOptionalValue(configuration, "output");
             string? correlationId = GetOptionalValue(configuration, "correlation-id");
+            string contentType = GetOptionalValue(
+                configuration,
+                "ContentType",
+                GetOptionalValue(configuration, "cty", CoseSign1MessageFactory.DEFAULT_CONTENT_TYPE))
+                ?? CoseSign1MessageFactory.DEFAULT_CONTENT_TYPE;
 
             if (!TryCreateHttpsEndpoint(proxyEndpoint, out Uri? proxyEndpointUri))
             {
@@ -185,6 +195,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
                     payloadStream,
                     configuration,
                     Logger,
+                    contentType,
                     hashAlgorithm,
                     rsaSignaturePadding,
                     headerExtender,
@@ -318,6 +329,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
         Stream payload,
         IConfiguration configuration,
         IPluginLogger logger,
+        string contentType,
         HashAlgorithmName hashAlgorithm,
         RSASignaturePadding rsaSignaturePadding,
         ICoseHeaderExtender? headerExtender,
@@ -336,7 +348,7 @@ public sealed class AzureArtifactSigningSignMstRegisterCommand : PluginCommandBa
             payload,
             signingKeyProvider,
             embedPayload: true,
-            contentType: CoseSign1MessageFactory.DEFAULT_CONTENT_TYPE,
+            contentType: contentType,
             headerExtender: headerExtender,
             cancellationToken: cancellationToken,
             signingOptions: signingOptions).ConfigureAwait(false);
