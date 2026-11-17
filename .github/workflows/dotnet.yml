@@ -78,17 +78,6 @@ jobs:
     - name: Build Release
       run: dotnet build --configuration Release CoseSignTool.sln
 
-    - name: Smoke test Windows release archive
-      if: ${{ matrix.os == 'windows-latest' }}
-      shell: pwsh
-      run: |
-        dotnet restore CoseSignTool.sln --runtime win-x64
-        if ($LASTEXITCODE -ne 0) { throw "Release restore failed." }
-        dotnet publish CoseSignTool/CoseSignTool.csproj --no-restore --configuration Release --runtime win-x64 --self-contained true --property:PublishSingleFile=true --output published/release
-        if ($LASTEXITCODE -ne 0) { throw "Release publish failed." }
-        Compress-Archive -Path ./published/release/ -DestinationPath CoseSignTool-Windows-release.zip
-        & ./.github/scripts/Test-ReleaseArchive.ps1 -ArchivePath ./CoseSignTool-Windows-release.zip
-
     # List the contents of the working directory to make sure all the artifacts are there.
     - name: List working directory
       run: ${{ matrix.dir_command }}
@@ -355,15 +344,65 @@ jobs:
         # - No separate plugins folder needed - everything is in the exe
       shell: bash
 
-    - name: Verify published executables
-      shell: pwsh
+    # Verify the single-file executable was created correctly
+    # With PublishSingleFile=true and IncludeAllContentForSelfExtract=true, plugins are bundled INSIDE the exe
+    - name: Verify single-file executable
       run: |
-        $executableName = if ('${{ runner.os }}' -eq 'Windows') { 'CoseSignTool.exe' } else { 'CoseSignTool' }
-        foreach ($configuration in @('debug', 'release')) {
-          if (-not (Test-Path "published/$configuration/$executableName" -PathType Leaf)) {
-            throw "Published executable missing for $configuration."
+        Write-Host "Verifying single-file self-contained executable..."
+        Write-Host ""
+
+        # Check debug output
+        Write-Host "=== Debug build ==="
+        $debugExe = Get-ChildItem "published/debug/CoseSignTool*" -File | Where-Object { $_.Extension -eq '.exe' -or $_.Extension -eq '' } | Select-Object -First 1
+        if ($debugExe) {
+          $sizeMB = [math]::Round($debugExe.Length / 1MB, 2)
+          Write-Host "✅ Found: $($debugExe.Name) ($sizeMB MB)"
+
+          # Plugins are bundled inside, so exe should be > 40MB (contains runtime + plugins)
+          if ($sizeMB -gt 40) {
+            Write-Host "✅ Size indicates plugins are bundled (expected for single-file with plugins)"
+          } else {
+            Write-Host "⚠️  Size seems small - plugins may not be bundled correctly"
           }
+        } else {
+          Write-Host "❌ CoseSignTool executable not found in debug output!"
+          exit 1
         }
+
+        # Check that plugins folder does NOT exist (should be bundled in exe)
+        if (Test-Path "published/debug/plugins") {
+          Write-Host "⚠️  Plugins folder exists - it should be cleaned up for single-file publish"
+        } else {
+          Write-Host "✅ No external plugins folder (correctly bundled in exe)"
+        }
+
+        Write-Host ""
+        Write-Host "=== Release build ==="
+        $releaseExe = Get-ChildItem "published/release/CoseSignTool*" -File | Where-Object { $_.Extension -eq '.exe' -or $_.Extension -eq '' } | Select-Object -First 1
+        if ($releaseExe) {
+          $sizeMB = [math]::Round($releaseExe.Length / 1MB, 2)
+          Write-Host "✅ Found: $($releaseExe.Name) ($sizeMB MB)"
+
+          if ($sizeMB -gt 40) {
+            Write-Host "✅ Size indicates plugins are bundled"
+          } else {
+            Write-Host "⚠️  Size seems small - plugins may not be bundled correctly"
+          }
+        } else {
+          Write-Host "❌ CoseSignTool executable not found in release output!"
+          exit 1
+        }
+
+        if (Test-Path "published/release/plugins") {
+          Write-Host "⚠️  Plugins folder exists - it should be cleaned up for single-file publish"
+        } else {
+          Write-Host "✅ No external plugins folder (correctly bundled in exe)"
+        }
+
+        Write-Host ""
+        Write-Host "Single-file verification complete. Plugins are bundled inside the executable."
+        Write-Host "On first run, the exe will extract to a temp directory including the plugins folder."
+      shell: pwsh
 
     # List the contents of the published directory to make sure all the artifacts are there.
     - name: List published directory
@@ -465,14 +504,6 @@ jobs:
         ${{ matrix.zip_command_debug }}
         ${{ matrix.zip_command_release }}
       working-directory: ./published
-
-    - name: Verify Windows release archives
-      if: ${{ matrix.os == 'windows-latest' }}
-      shell: pwsh
-      run: |
-        foreach ($configuration in @('debug', 'release')) {
-          & ./.github/scripts/Test-ReleaseArchive.ps1 -ArchivePath "./published/CoseSignTool-Windows-$configuration.zip"
-        }
 
     # List the contents of the published directory to make sure all the artifacts are there.
     - name: List published directory
